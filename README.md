@@ -93,7 +93,7 @@ delayMs: Base typing speed
 package main
 
 import (
-    "github.com/bosniankicks/greenlight/pkg/browser"
+    browser "github.com/bosniankicks/greenlight/pkg/browser"
 )
 
 func main() {
