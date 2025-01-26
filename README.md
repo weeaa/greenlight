@@ -6,6 +6,7 @@ Greenlight is the first undetected Golang based Web-Automation Framework. Greenl
 
 ```go
 go get github.com/bosniankicks/greenlight
+go mod tidy
 ```
 
 ## Components
