@@ -1,6 +1,6 @@
 # GREENLIGHT 🚦
 
-Greenlight is the first undetected Golang based Web-Automation Framework. Greenlight was made to create a way for Golang devs to utilize the lightweight code for fast automation browsing. With added error handling internally, the user can write their code just like playwright in python! Usage shown below. 
+Greenlight is the first undetected Golang based Web-Automation Framework. Greenlight was made to create a way for Golang devs to utilize the lightweight code for fast automation browsing. With added error handling internally, the user can write their code just like playwright in python! No more err pain! Usage shown below :) 
 
 ## Installation
 
