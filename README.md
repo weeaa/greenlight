@@ -132,6 +132,8 @@ The framework lacks functionality as you only really need to input things and cl
 
 This does not work on CLOUDFLARE or any CAPTCHA, helps users bypass fingerprint anitbots such as Akamai, Kasada, DataDome, and others. 
 
+Checkout my previous work @ https://github.com/bosniankicks/Kurva-Krome
+
 Send me money as support for redbulls and geek bars -- cashapp -- $bosniankicks
 
 ## License
