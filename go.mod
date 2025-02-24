@@ -1,4 +1,4 @@
-module github.com/bosniankicks/greenlight
+module github.com/weeaa/greenlight
 
 go 1.23.5
 
