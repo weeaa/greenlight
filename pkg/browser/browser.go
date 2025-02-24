@@ -17,6 +17,8 @@ import (
 	"github.com/weeaa/greenlight/pkg/page"
 )
 
+const DefaultMacOSChromePath = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
 type Browser struct {
 	execPath     string
 	wsEndpoint   string
