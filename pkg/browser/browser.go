@@ -3,8 +3,8 @@ package browser
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -27,12 +27,12 @@ type Browser struct {
 	userDataDir  string
 	messageID    int
 	messageMutex sync.Mutex
-	pid          int
+	PID          int
 	isHeadless   bool
 }
 
-func GreenLight(execPath string, isHeadless bool, startURL string) *Browser {
-	ctx, cancel := context.WithCancel(context.Background())
+func GreenLight(ctx context.Context, execPath string, isHeadless bool, startURL string) (*Browser, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	userDataDir := filepath.Join(os.TempDir(), fmt.Sprintf("greenlight_%s", uuid.New().String()))
 
 	browser := &Browser{
@@ -44,16 +44,15 @@ func GreenLight(execPath string, isHeadless bool, startURL string) *Browser {
 	}
 
 	if err := browser.launch(startURL); err != nil {
-		log.Fatalf("Failed to launch browser: %v", err)
+		return nil, err
 	}
 
-	return browser
+	return browser, nil
 }
 
 func (b *Browser) launch(startURL string) error {
-	debugPort := "9222"
 	args := []string{
-		"--remote-debugging-port=" + debugPort,
+		"--remote-debugging-port=" + os.Getenv("DEBUG_PORT"),
 		"--no-first-run",
 		"--user-data-dir=" + b.userDataDir,
 		"--remote-allow-origins=*",
@@ -69,28 +68,23 @@ func (b *Browser) launch(startURL string) error {
 		return fmt.Errorf("failed to start browser: %v", err)
 	}
 
-	b.pid = b.cmd.Process.Pid
-	log.Printf("Chrome started with PID: %d", b.pid)
+	b.PID = b.cmd.Process.Pid
 
 	time.Sleep(time.Second)
-	if err := b.attachToPage(); err != nil {
-		return err
-	}
 
-	return nil
+	return b.attachToPage()
 }
 
 func (b *Browser) attachToPage() error {
-	debugPort := "9222"
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%s/json", debugPort))
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%s/json", os.Getenv("DEBUG_PORT")))
 	if err != nil {
-		return fmt.Errorf("failed to fetch active pages: %v", err)
+		return fmt.Errorf("failed to fetch active pages: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var pages []map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&pages); err != nil {
-		return fmt.Errorf("failed to decode JSON: %v", err)
+		return fmt.Errorf("failed to decode JSON: %w", err)
 	}
 
 	for _, page := range pages {
@@ -101,11 +95,10 @@ func (b *Browser) attachToPage() error {
 				}
 				conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 				if err != nil {
-					return fmt.Errorf("failed to connect to page WebSocket: %v", err)
+					return fmt.Errorf("failed to connect to page WebSocket: %w", err)
 				}
 				b.conn = conn
 				b.wsEndpoint = wsURL
-				log.Printf("Connected to page: %s", page["url"])
 				return nil
 			}
 		}
@@ -126,23 +119,22 @@ func (b *Browser) SendCommandWithResponse(method string, params map[string]inter
 
 	if b.conn == nil {
 		if err := b.attachToPage(); err != nil {
-			return nil, fmt.Errorf("failed to reconnect WebSocket: %v", err)
+			return nil, fmt.Errorf("failed to reconnect ws: %w", err)
 		}
 	}
 
 	if err := b.conn.WriteJSON(message); err != nil {
-		return nil, fmt.Errorf("failed to send WebSocket message: %v", err)
+		return nil, fmt.Errorf("failed to send ws message: %w", err)
 	}
 
 	for {
 		_, data, err := b.conn.ReadMessage()
 		if err != nil {
-			return nil, fmt.Errorf("failed to read WebSocket message: %v", err)
+			return nil, fmt.Errorf("failed to read ws message: %w", err)
 		}
 
 		var response map[string]interface{}
 		if err := json.Unmarshal(data, &response); err != nil {
-			log.Printf("Failed to parse WebSocket message: %s", string(data))
 			continue
 		}
 
@@ -166,45 +158,48 @@ func (b *Browser) SendCommandWithoutResponse(method string, params map[string]in
 
 	if b.conn == nil {
 		if err := b.attachToPage(); err != nil {
-			return fmt.Errorf("failed to reconnect WebSocket: %v", err)
+			return fmt.Errorf("failed to reconnect ws: %w", err)
 		}
 	}
 
 	if err := b.conn.WriteJSON(message); err != nil {
-		return fmt.Errorf("failed to send WebSocket message: %v", err)
+		return fmt.Errorf("failed to send ws message: %w", err)
 	}
 
 	return nil
 }
 
-func (b *Browser) NewPage() *page.Page {
+func (b *Browser) NewPage() (*page.Page, error) {
 	if b.conn == nil {
-		log.Fatal("WebSocket connection not established. Cannot create a new page.")
+		return nil, errors.New("ws connection not established, cannot create a new page")
 	}
-	return page.NewPage(b)
+	return page.NewPage(b), nil
 }
 
-func (b *Browser) RedLight() {
+func (b *Browser) RedLight() error {
 	if b.conn != nil {
 		if err := b.conn.Close(); err != nil {
-			log.Printf("Error closing WebSocket: %v", err)
+			return fmt.Errorf("error closing ws: %w", err)
 		}
 	}
 
 	if b.cmd != nil && b.cmd.Process != nil {
 		if err := b.cmd.Process.Kill(); err != nil {
-			log.Printf("Error killing browser process: %v", err)
+			return fmt.Errorf("error killing browser process: %w", err)
 		} else {
-			b.cmd.Wait()
+			if err = b.cmd.Wait(); err != nil {
+				return err
+			}
 		}
 	}
 
 	if b.userDataDir != "" {
 		if err := os.RemoveAll(b.userDataDir); err != nil {
-			log.Printf("Error removing user data directory: %v", err)
+			return fmt.Errorf("error removing user data directory: %w", err)
 		}
 	}
 
 	b.cancel()
-	log.Println("Browser closed successfully.")
+
+	return nil
 }
