@@ -316,3 +316,10 @@ func (p *Page) GetHtml() (string, error) {
 
 	return "", fmt.Errorf("unexpected response format: %v", response)
 }
+
+func (p *Page) Refresh() error {
+	if err := p.browser.SendCommandWithoutResponse("Page.reload", nil); err != nil {
+		return fmt.Errorf("failed to refresh the page: %w", err)
+	}
+	return nil
+}
