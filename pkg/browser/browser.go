@@ -39,6 +39,7 @@ func GreenLight(ctx context.Context, execPath string, isHeadless bool, startURL,
 	userDataDir := filepath.Join(os.TempDir(), fmt.Sprintf("greenlight_%s", uuid.New().String()))
 
 	browser := &Browser{
+		DebugPort:   debugPort,
 		execPath:    execPath,
 		context:     ctx,
 		cancel:      cancel,
