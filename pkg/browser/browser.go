@@ -31,9 +31,10 @@ type Browser struct {
 	messageMutex sync.Mutex
 	PID          int
 	isHeadless   bool
+	DebugPort    string
 }
 
-func GreenLight(ctx context.Context, execPath string, isHeadless bool, startURL string) (*Browser, error) {
+func GreenLight(ctx context.Context, execPath string, isHeadless bool, startURL, debugPort string) (*Browser, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	userDataDir := filepath.Join(os.TempDir(), fmt.Sprintf("greenlight_%s", uuid.New().String()))
 
@@ -54,7 +55,7 @@ func GreenLight(ctx context.Context, execPath string, isHeadless bool, startURL 
 
 func (b *Browser) launch(startURL string) error {
 	args := []string{
-		"--remote-debugging-port=" + os.Getenv("DEBUG_PORT"),
+		"--remote-debugging-port=" + b.DebugPort,
 		"--no-first-run",
 		"--user-data-dir=" + b.userDataDir,
 		"--remote-allow-origins=*",
@@ -78,7 +79,7 @@ func (b *Browser) launch(startURL string) error {
 }
 
 func (b *Browser) attachToPage() error {
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%s/json", os.Getenv("DEBUG_PORT")))
+	resp, err := http.Get(fmt.Sprintf("http://localhost:%s/json", b.DebugPort))
 	if err != nil {
 		return fmt.Errorf("failed to fetch active pages: %w", err)
 	}
