@@ -323,3 +323,29 @@ func (p *Page) Refresh() error {
 	}
 	return nil
 }
+
+func (p *Page) GetHttpStatus() (int, error) {
+	params := map[string]interface{}{
+		"expression": `(() => {
+			const navEntries = window.performance.getEntriesByType('navigation');
+			if (navEntries.length === 0) return 0;
+			return navEntries[0].responseStatus;
+		})()`,
+		"returnByValue": true,
+	}
+
+	response, err := p.browser.SendCommandWithResponse("Runtime.evaluate", params)
+	if err != nil {
+		return 0, fmt.Errorf("failed to evaluate JS for status: %w", err)
+	}
+
+	if result, ok := response["result"].(map[string]interface{}); ok {
+		if nestedResult, ok := result["result"].(map[string]interface{}); ok {
+			if status, ok := nestedResult["value"].(float64); ok {
+				return int(status), nil
+			}
+		}
+	}
+
+	return 0, fmt.Errorf("unexpected response format: %v", response)
+}
