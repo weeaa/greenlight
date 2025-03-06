@@ -32,11 +32,23 @@ type Browser struct {
 	PID          int
 	isHeadless   bool
 	DebugPort    string
+	proxyConfig  *ProxyConfig
 }
 
-func GreenLight(ctx context.Context, execPath string, isHeadless bool, startURL, debugPort string) (*Browser, error) {
+type ProxyConfig struct {
+	Server   string
+	Username string // opt
+	Password string // opt
+}
+
+func GreenLight(ctx context.Context, execPath string, isHeadless bool, startURL, debugPort string, proxyConfig ...*ProxyConfig) (*Browser, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	userDataDir := filepath.Join(os.TempDir(), fmt.Sprintf("greenlight_%s", uuid.New().String()))
+
+	var proxy *ProxyConfig
+	if len(proxyConfig) > 0 {
+		proxy = proxyConfig[0]
+	}
 
 	browser := &Browser{
 		DebugPort:   debugPort,
@@ -45,6 +57,7 @@ func GreenLight(ctx context.Context, execPath string, isHeadless bool, startURL,
 		cancel:      cancel,
 		userDataDir: userDataDir,
 		isHeadless:  isHeadless,
+		proxyConfig: proxy,
 	}
 
 	if err := browser.launch(startURL); err != nil {
@@ -65,6 +78,18 @@ func (b *Browser) launch(startURL string) error {
 
 	if b.isHeadless {
 		args = append(args, "--headless=new")
+	}
+
+	if b.proxyConfig != nil {
+		args = append(args, fmt.Sprintf("--proxy-server=%s", b.proxyConfig.Server))
+
+		if b.proxyConfig.Username != "" && b.proxyConfig.Password != "" {
+			args = append(args, fmt.Sprintf(
+				"--proxy-bypass-list=<-loopback>",
+				b.proxyConfig.Username,
+				b.proxyConfig.Password,
+			))
+		}
 	}
 
 	b.cmd = exec.CommandContext(b.context, b.execPath, args...)
